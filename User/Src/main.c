@@ -27,22 +27,40 @@
 
 /* Private function prototypes -----------------------------------------------*/
 static int GetUserButtonPressed(void);
-static int GetTouchState (int *xCoord, int *yCoord);
+static int GetTouchState(int *xCoord, int *yCoord);
 
 /**
  * @brief This function handles System tick timer.
  */
-void SysTick_Handler(void)
-{
+
+float cnt = 0;
+float cnt2 = 0;
+
+static volatile int cntbutton = 0;
+
+void SysTick_Handler(void) {
 	HAL_IncTick();
+
+	if (cntbutton % 2) {
+		cnt++;
+	} else {
+		cnt2++;
+	}
 }
+
+void EXTI0_IRQHandler(void) {
+	cntbutton++;
+
+	HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_13);
+	__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
+}
+
 
 /**
  * @brief  The application entry point.
  * @retval int
  */
-int main(void)
-{
+int main(void) {
 	/* MCU Configuration--------------------------------------------------------*/
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
 	HAL_Init();
@@ -54,7 +72,6 @@ int main(void)
 	TS_Init(LCD_GetXSize(), LCD_GetYSize());
 	/* touch screen calibration */
 	//	TS_Calibration();
-
 	/* Clear the LCD and display basic starter text */
 	LCD_Clear(LCD_COLOR_BLACK);
 	LCD_SetTextColor(LCD_COLOR_YELLOW);
@@ -70,28 +87,50 @@ int main(void)
 
 	LCD_SetFont(&Font8);
 	LCD_SetColors(LCD_COLOR_MAGENTA, LCD_COLOR_BLACK); // TextColor, BackColor
-	LCD_DisplayStringAtLineMode(39, "copyright xyz", CENTER_MODE);
+	LCD_DisplayStringAtLineMode(39, "copyright Plasch", CENTER_MODE);
 
-	int cnt = 0;
 	/* Infinite loop */
-	while (1)
-	{
+
+	__HAL_RCC_GPIOG_CLK_ENABLE();
+
+	GPIO_InitTypeDef pa0;
+	pa0.Alternate = 0;
+	pa0.Mode = GPIO_MODE_IT_RISING;
+	pa0.Pin = GPIO_PIN_0;
+	pa0.Pull = GPIO_NOPULL;
+	pa0.Speed = GPIO_SPEED_MEDIUM;
+	HAL_GPIO_Init(GPIOA, &pa0);
+
+	GPIO_InitTypeDef pg13;
+	pg13.Alternate = 0;
+	pg13.Mode = GPIO_MODE_OUTPUT_PP;
+	pg13.Pin = GPIO_PIN_13;
+	pg13.Pull = GPIO_NOPULL;
+	pg13.Speed = GPIO_SPEED_MEDIUM;
+	HAL_GPIO_Init(GPIOG, &pg13);
+
+	HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+	while (1) {
+
 		//execute main loop every 100ms
-		HAL_Delay(100);
+		HAL_Delay(10);
 
 		// display timer
 		cnt++;
 		LCD_SetFont(&Font20);
 		LCD_SetTextColor(LCD_COLOR_BLUE);
 		LCD_SetPrintPosition(5, 0);
-		printf("   Timer: %.1f", cnt/10.0);
+		printf("   Timer: %.2f", cnt / 100.0);
+
+		LCD_SetPrintPosition(6, 0);
+		printf(" 	Timer2: %.2f", cnt2 / 100.0);
 
 		// test touch interface
 		int x, y;
 		if (GetTouchState(&x, &y)) {
 			LCD_FillCircle(x, y, 5);
 		}
-
 
 	}
 }
@@ -111,8 +150,8 @@ static int GetUserButtonPressed(void) {
  * @param yCoord y coordinate of touch event in pixels
  * @return 1 if touch event has been detected
  */
-static int GetTouchState (int* xCoord, int* yCoord) {
-	void    BSP_TS_GetState(TS_StateTypeDef *TsState);
+static int GetTouchState(int *xCoord, int *yCoord) {
+	void BSP_TS_GetState(TS_StateTypeDef *TsState);
 	TS_StateTypeDef TsState;
 	int touchclick = 0;
 
@@ -129,5 +168,4 @@ static int GetTouchState (int* xCoord, int* yCoord) {
 
 	return touchclick;
 }
-
 
